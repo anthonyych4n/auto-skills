@@ -4,7 +4,7 @@
   "description": "30s launch clip for auto-skills, made with Remotion",
   "scripts": {
     "studio": "remotion studio",
-    "render": "remotion render Launch16x9 out/launch-16x9.mp4 && remotion render Launch9x16 out/launch-9x16.mp4",
+    "render": "remotion render Launch16x9 out/auto-skills-demo-16x9.mp4 && remotion render Launch9x16 out/auto-skills-demo-9x16.mp4",
     "still": "remotion still"
   },
   "dependencies": {

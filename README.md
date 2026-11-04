@@ -87,7 +87,7 @@ with each other. It runs in about 0.1 s and exits quietly on anything unexpected
 ```bash
 python3 -m unittest discover tests
 cd demo && npm install && npm run studio   # the launch clip, made with Remotion
-npm run render                              # → demo/out/launch-{16x9,9x16}.mp4
+npm run render                              # → demo/out/auto-skills-demo-{16x9,9x16}.mp4
 ```
 
 MIT licensed.
