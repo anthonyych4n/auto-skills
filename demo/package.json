@@ -5,7 +5,8 @@
   "scripts": {
     "studio": "remotion studio",
     "render": "remotion render Launch16x9 out/auto-skills-demo-16x9.mp4 && remotion render Launch9x16 out/auto-skills-demo-9x16.mp4",
-    "still": "remotion still"
+    "still": "remotion still",
+    "render:sound": "remotion render Launch16x9Sound out/auto-skills-demo-16x9-sound.mp4 && remotion render Launch9x16Sound out/auto-skills-demo-9x16-sound.mp4"
   },
   "dependencies": {
     "@remotion/cli": "4.0.538",

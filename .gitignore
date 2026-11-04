@@ -3,3 +3,6 @@ __pycache__/
 node_modules/
 demo/out/
 *.local.*
+
+# Licensed music (Pixabay etc.) must not be redistributed as a raw file
+demo/public/music/
