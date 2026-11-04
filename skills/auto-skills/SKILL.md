@@ -39,6 +39,6 @@ Add rules the user describes in plain words. Run `check` afterwards to prove the
 | stop doing it automatically / start again | `off` / `on` |
 | status | `status` |
 
-Links go in `<project>/.claude/skills/` and are git-excluded, so they never get committed. Newly
-linked skills load right away at session start; ones linked mid-session load on the next session or
-`/clear`. Opt one project out with `touch .claude/.no-auto-skills`.
+Links go in `<project>/.claude/skills/` and are git-excluded, so they never get committed. Skills
+linked at session start load right away. If one linked mid-session doesn't show up, start a new
+session or run `/clear`. Opt one project out with `touch .claude/.no-auto-skills`.
