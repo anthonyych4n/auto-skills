@@ -4,6 +4,8 @@
 
 ![auto-skills: a Remotion project gets video skills, then a Next.js app swaps in design skills](media/auto-skills-swap.gif)
 
+https://github.com/user-attachments/assets/90390974-cb0d-4612-b986-012884e55125
+
 Claude loads every skill you have into every session. auto-skills turns on only the ones each
 project needs: your video skills in a Remotion repo, your design skills in a Next.js app.
 
