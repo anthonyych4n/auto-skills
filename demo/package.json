@@ -1,0 +1,21 @@
+{
+  "name": "auto-skills-demo",
+  "private": true,
+  "description": "30s launch clip for auto-skills, made with Remotion",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render Launch16x9 out/launch-16x9.mp4 && remotion render Launch9x16 out/launch-9x16.mp4",
+    "still": "remotion still"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.538",
+    "@remotion/google-fonts": "4.0.538",
+    "react": "19.2.9",
+    "react-dom": "19.2.9",
+    "remotion": "4.0.538"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "typescript": "5.9.3"
+  }
+}
