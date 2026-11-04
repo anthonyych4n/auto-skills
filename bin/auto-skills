@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""auto-skills: turn on the right Claude Code skills for each project, automatically.
+
+Keep a skills library (<library>/<category>/<skill>/SKILL.md). When a session starts, a SessionStart
+hook matches the project against your rules (package.json deps, files) and links the matching
+skills into <project>/.claude/skills, so only that project sees them.
+
+  auto-skills init --library DIR [--rules FILE]   point at your skills library
+  auto-skills on | off | status                   toggle automatic mode
+  auto-skills check [DIR]                         preview what a project would get
+  auto-skills use [--off] SKILL|CATEGORY...       turn skills on/off for the current project
+  auto-skills use --list                          what the current project has on
+  auto-skills install-hook | uninstall-hook       add/remove the SessionStart hook in settings.json
+  auto-skills hook                                (called by Claude Code; reads hook JSON on stdin)
+"""
+import fnmatch
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve()
+CLAUDE_DIR = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
+CONFIG = Path(os.environ.get("AUTO_SKILLS_CONFIG") or Path.home() / ".config" / "auto-skills" / "config.json")
+FLAG = CLAUDE_DIR / ".auto-skills"
+OPT_OUT = Path(".claude") / ".no-auto-skills"
+EXAMPLE_RULES = HERE.parent.parent / "rules.example"
+
+
+# ---------- config ----------
+
+def load_config():
+    try:
+        cfg = json.loads(CONFIG.read_text())
+    except (OSError, ValueError):
+        cfg = {}
+    lib = os.environ.get("AUTO_SKILLS_LIBRARY") or cfg.get("library")
+    if not lib:
+        sys.exit("auto-skills: no library set. Run: auto-skills init --library <your skills folder>")
+    library = Path(lib).expanduser().resolve()
+    rules = cfg.get("rules")
+    rules = Path(rules).expanduser() if rules else (library / "AUTO" if (library / "AUTO").exists() else EXAMPLE_RULES)
+    return library, rules
+
+
+# ---------- library ----------
+
+def skills_in(library):
+    """name -> skill dir, for <library>/<skill>/SKILL.md and <library>/<category>/<skill>/SKILL.md."""
+    found = {}
+    for md in sorted(library.glob("*/SKILL.md")) + sorted(library.glob("*/*/SKILL.md")):
+        found.setdefault(md.parent.name, md.parent)
+    return found
+
+
+def expand(library, names):
+    """Skill or category names -> (skill names, unknown names)."""
+    skills, out, unknown = skills_in(library), [], []
+    for n in names:
+        cat = library / n
+        members = [d.name for d in sorted(cat.iterdir()) if d.is_dir()] if cat.is_dir() and not (cat / "SKILL.md").exists() else [n]
+        for m in members:
+            if m in skills:
+                if m not in out:
+                    out.append(m)
+            elif m not in unknown:
+                unknown.append(m)
+    return out, unknown
+
+
+# ---------- rules ----------
+
+def read_rules(path):
+    rules = []
+    for raw in Path(path).read_text().splitlines():
+        parts = raw.split("#", 1)[0].split()
+        if len(parts) >= 3 and parts[0] in ("dep", "file"):
+            rules.append((parts[0], parts[1], parts[2:]))
+    return rules
+
+
+def package_deps(project):
+    try:
+        pkg = json.loads((project / "package.json").read_text())
+    except (OSError, ValueError):
+        return set()
+    return set(pkg.get("dependencies") or {}) | set(pkg.get("devDependencies") or {})
+
+
+def match(project, rules):
+    deps = package_deps(project)
+    files = [p.name for p in project.iterdir()] if project.is_dir() else []
+    names, why = [], []
+    for kind, value, targets in rules:
+        pool = deps if kind == "dep" else files
+        if any(fnmatch.fnmatchcase(x, value) for x in pool):
+            why.append(f"{kind} {value}")
+            names += [t for t in targets if t not in names]
+    return names, why
+
+
+def is_project(path, library):
+    path = path.resolve()
+    if path in (Path.home().resolve(), Path("/")) or library in (path, *path.parents) or path in library.parents:
+        return False
+    return (path / ".git").exists() or (path / "package.json").exists()
+
+
+# ---------- linking ----------
+
+def git_exclude(project):
+    try:
+        out = subprocess.run(["git", "-C", str(project), "rev-parse", "--git-path", "info/exclude"],
+                             capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if out.returncode != 0:
+        return None
+    p = Path(out.stdout.strip())
+    return p if p.is_absolute() else project / p
+
+
+def link(project, library, names):
+    """Link skills into project/.claude/skills. Returns (newly_linked, external)."""
+    skills = skills_in(library)
+    wanted, external = expand(library, names)
+    target = project / ".claude" / "skills"
+    target.mkdir(parents=True, exist_ok=True)
+    exclude = git_exclude(project)
+    excluded = exclude.read_text().splitlines() if exclude and exclude.exists() else []
+    new = []
+    for n in wanted:
+        dest, src = target / n, skills[n]
+        if dest.is_symlink() and Path(os.readlink(dest)) == src:
+            continue
+        if dest.exists() or dest.is_symlink():
+            print(f"skip      {n}  ({dest} exists and isn't ours)", file=sys.stderr)
+            continue
+        dest.symlink_to(src)
+        new.append(n)
+        entry = f".claude/skills/{n}"
+        if exclude and entry not in excluded:
+            exclude.parent.mkdir(parents=True, exist_ok=True)
+            with exclude.open("a") as f:
+                f.write(entry + "\n")
+            excluded.append(entry)
+    return new, external
+
+
+def ours(project, library):
+    target = project / ".claude" / "skills"
+    if not target.is_dir():
+        return []
+    return [l for l in sorted(target.iterdir()) if l.is_symlink() and library in Path(os.readlink(l)).parents]
+
+
+def unlink(project, library, names):
+    wanted, _ = expand(library, names)
+    gone = []
+    for l in ours(project, library):
+        if l.name in wanted:
+            l.unlink()
+            gone.append(l.name)
+    return gone
+
+
+# ---------- settings.json hook ----------
+
+def settings_path():
+    return CLAUDE_DIR / "settings.json"
+
+
+def hook_command():
+    return f'"{HERE}" hook'
+
+
+def is_our_hook(h):
+    return "auto-skills" in h.get("command", "") and h.get("command", "").rstrip().endswith(" hook")
+
+
+def install_hook():
+    path = settings_path()
+    settings = json.loads(path.read_text()) if path.exists() else {}
+    groups = settings.setdefault("hooks", {}).setdefault("SessionStart", [])
+    for g in groups:
+        for h in g.get("hooks", []):
+            if is_our_hook(h):
+                h["command"] = hook_command()
+                write_settings(path, settings)
+                return "updated"
+    groups.append({"matcher": "startup|clear", "hooks": [{"type": "command", "command": hook_command(), "timeout": 20}]})
+    write_settings(path, settings)
+    return "installed"
+
+
+def uninstall_hook():
+    path = settings_path()
+    if not path.exists():
+        return "not installed"
+    settings = json.loads(path.read_text())
+    groups = settings.get("hooks", {}).get("SessionStart", [])
+    before = sum(len(g.get("hooks", [])) for g in groups)
+    for g in groups:
+        g["hooks"] = [h for h in g.get("hooks", []) if not is_our_hook(h)]
+    groups[:] = [g for g in groups if g.get("hooks")]
+    if not groups:
+        settings.get("hooks", {}).pop("SessionStart", None)
+    if sum(len(g.get("hooks", [])) for g in groups) == before:
+        return "not installed"
+    write_settings(path, settings)
+    return "removed"
+
+
+def write_settings(path, settings):
+    if path.exists():
+        shutil.copy2(path, path.with_name(f"settings.json.bak-{time.strftime('%Y%m%d-%H%M%S')}"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(settings, indent=2) + "\n")
+    tmp.replace(path)
+
+
+# ---------- commands ----------
+
+def cmd_hook():
+    try:
+        data = json.load(sys.stdin)
+    except ValueError:
+        data = {}
+    if not FLAG.exists():
+        return
+    project = Path(data.get("cwd") or os.getcwd())
+    library, rules = load_config()
+    if not is_project(project, library) or (project / OPT_OUT).exists():
+        return
+    names, why = match(project, read_rules(rules))
+    if not names:
+        return
+    new, _ = link(project, library, names)
+    on = [l.name for l in ours(project, library)]
+    msg = (f"auto-skills: project matched {', '.join(why)}; skills on for this project: {', '.join(on)}"
+           + (f" (just turned on: {', '.join(new)})" if new else "")
+           + ". Mention this to the user only if relevant. Turn off with `auto-skills off`.")
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "reloadSkills": bool(new),
+                                             "additionalContext": msg}}))
+
+
+def main(argv):
+    cmd, args = (argv[0], argv[1:]) if argv else ("status", [])
+    if cmd == "hook":
+        try:
+            cmd_hook()
+        except BaseException as e:  # never break session start
+            print(f"auto-skills hook error: {e}", file=sys.stderr)
+        return 0
+    if cmd == "init":
+        if "--library" not in args:
+            sys.exit("usage: auto-skills init --library DIR [--rules FILE]")
+        cfg = {"library": str(Path(args[args.index("--library") + 1]).expanduser().resolve())}
+        if "--rules" in args:
+            cfg["rules"] = str(Path(args[args.index("--rules") + 1]).expanduser().resolve())
+        CONFIG.parent.mkdir(parents=True, exist_ok=True)
+        CONFIG.write_text(json.dumps(cfg, indent=2) + "\n")
+        library, rules = load_config()
+        print(f"library: {library} ({len(skills_in(library))} skills)\nrules:   {rules}\nconfig:  {CONFIG}")
+    elif cmd == "on":
+        FLAG.parent.mkdir(parents=True, exist_ok=True)
+        FLAG.touch()
+        print("auto-skills: on. New sessions turn on skills by project type.")
+    elif cmd == "off":
+        FLAG.unlink(missing_ok=True)
+        print("auto-skills: off. Skills already linked stay; remove them with `auto-skills use --off ...`.")
+    elif cmd == "status":
+        hooked = settings_path().exists() and "auto-skills" in settings_path().read_text()
+        print(f"auto-skills: {'on' if FLAG.exists() else 'off'} · hook {'installed' if hooked else 'not installed'}")
+    elif cmd == "check":
+        library, rules = load_config()
+        project = Path(args[0] if args else os.getcwd()).resolve()
+        names, why = match(project, read_rules(rules))
+        wanted, external = expand(library, names)
+        print(f"{project}{'' if is_project(project, library) else '  (not a project: skipped)'}")
+        print(f"  matched:       {', '.join(why) or 'nothing'}")
+        print(f"  would turn on: {', '.join(wanted) or 'nothing'}")
+        if external:
+            print(f"  not linkable:  {', '.join(external)} (install these yourself)")
+    elif cmd == "use":
+        library, _ = load_config()
+        project = Path.cwd()
+        if args == ["--list"]:
+            for l in ours(project, library):
+                print(f"  on   {l.name}")
+        elif args[:1] == ["--off"] and args[1:]:
+            for n in unlink(project, library, args[1:]):
+                print(f"off       {n}")
+        elif args:
+            new, external = link(project, library, args)
+            for n in new:
+                print(f"on        {n}")
+            for n in external:
+                print(f"external  {n}  (no SKILL.md in the library; install it yourself)")
+        else:
+            sys.exit("usage: auto-skills use [--off] SKILL|CATEGORY... | --list")
+    elif cmd == "install-hook":
+        print(f"SessionStart hook {install_hook()} in {settings_path()}. Run `auto-skills on` to enable.")
+    elif cmd == "uninstall-hook":
+        print(f"SessionStart hook {uninstall_hook()}.")
+    else:
+        print(__doc__)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

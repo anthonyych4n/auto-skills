@@ -1,0 +1,21 @@
+# auto-skills rules: when a Claude Code session starts in a project, every matching rule turns
+# its skills on for THAT project. Copy this to <your library>/AUTO and edit it.
+#
+# <check> <value>        <skills or categories...>
+#   dep  = package.json dependency/devDependency (exact name or glob, e.g. @remotion/*)
+#   file = file or glob in the project root
+# Targets are skill folder names or category folder names in your library.
+
+dep  remotion            motion
+dep  @remotion/*         motion
+file remotion.config.*   motion
+dep  next                design
+dep  react               design
+dep  vue                 design
+dep  svelte              design
+dep  tailwindcss         design
+file components.json     design        # shadcn/ui
+file Package.swift       ios
+file *.xcodeproj         ios
+file pyproject.toml      python
+file Cargo.toml          rust
