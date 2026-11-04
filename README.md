@@ -2,6 +2,10 @@
 
 **The right Claude Code skills for each project, turned on automatically.**
 
+![auto-skills: a Remotion project gets video skills, then a Next.js app swaps in design skills](media/auto-skills-swap.gif)
+
+**Full 30-second demo:**
+
 https://github.com/user-attachments/assets/4ae070b0-cffc-4532-a35f-861fd1667617
 
 Everything in `~/.claude/skills` loads into every session, so your video skills sit in your app
