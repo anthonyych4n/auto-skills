@@ -1,6 +1,6 @@
 ---
 name: auto-skills
-description: Set up and manage auto-skills, which turns skills on per project at session start. Use when the user wants to set up auto-skills, point it at their skills folder, add or change a rule ("turn on my video skills in Remotion projects"), turn a skill or category on/off for the current project, check what a project gets, or turn auto mode on/off.
+description: Set up and manage auto-skills, which turns skills on per project at session start. Use when the user wants to set up auto-skills, point it at their skills folder, add or change a rule ("turn on my video skills in Remotion projects"), turn a skill or category on/off for the current project, ask what skills a project gets and why, or pause/resume auto-skills.
 ---
 
 # auto-skills
@@ -35,8 +35,8 @@ Add rules the user describes in plain words. Run `check` afterwards to prove the
 | turn on X for this project | `use X` (skill or category), from the project root |
 | turn X off here | `use --off X` |
 | what's on here | `use --list` |
-| what would this project get | `check` |
-| stop doing it automatically / start again | `off` / `on` |
+| what skills does this project get / why | `use --list`, then `check` for the matching rules |
+| pause / resume auto-skills | `off` / `on` |
 | status | `status` |
 
 Links go in `<project>/.claude/skills/` and are git-excluded, so they never get committed. Skills

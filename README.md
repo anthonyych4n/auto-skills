@@ -4,94 +4,82 @@
 
 ![auto-skills: a Remotion project gets video skills, then a Next.js app swaps in design skills](media/auto-skills-swap.gif)
 
-**Full 30-second demo:**
-
-https://github.com/user-attachments/assets/4ae070b0-cffc-4532-a35f-861fd1667617
-
-Everything in `~/.claude/skills` loads into every session, so your video skills sit in your app
-repo and your design skills sit in your video repo. auto-skills keeps your skills in a library and,
-when a session starts, turns on only the ones that project needs:
-
-```
-~/Projects/launch-video  (remotion in package.json)  →  motion skills + stageshow
-~/Projects/my-app        (next, tailwindcss)          →  design skills
-~/Projects/notes         (nothing matches)            →  nothing extra
-```
-
-The skills are linked into `<project>/.claude/skills/` and git-excluded, so they never get committed.
+Claude loads every skill you have into every session. auto-skills turns on only the ones each
+project needs: your video skills in a Remotion repo, your design skills in a Next.js app.
 
 ## Install
-
-As a Claude Code plugin (recommended):
 
 ```
 /plugin marketplace add anthonyych4n/auto-skills
 /plugin install auto-skills@auto-skills
 ```
 
-Then tell Claude **"set up auto-skills"**. It asks where your skills are, writes the config, and
-helps you tune the rules.
+Then tell Claude: **"set up auto-skills"**. It finds your skills and picks sensible rules.
 
-Without the plugin system:
+## Use it
 
-```bash
-git clone https://github.com/anthonyych4n/auto-skills ~/Projects/auto-skills
-ln -s ~/Projects/auto-skills/bin/auto-skills ~/.local/bin/auto-skills
-auto-skills init --library ~/path/to/your/skills
-auto-skills install-hook          # adds a SessionStart hook to ~/.claude/settings.json (backed up first)
+Just ask Claude:
+
+| Say | What happens |
+|---|---|
+| "turn on my design skills here" | design skills on for this project |
+| "use my video skills in Remotion projects" | adds a rule, so it happens automatically |
+| "what skills does this project get?" | shows what's on and why |
+| "pause auto-skills" | stops switching skills (and "resume" to start again) |
+
+<details>
+<summary><b>Full 30-second demo</b></summary>
+
+https://github.com/user-attachments/assets/4ae070b0-cffc-4532-a35f-861fd1667617
+
+</details>
+
+<details>
+<summary><b>How it works</b></summary>
+
+Your skills live in a library folder instead of `~/.claude/skills`. When a session starts, a hook
+checks the project's `package.json` and files against your rules, links the matching skills into
+`<project>/.claude/skills/` (git-excluded, so they're never committed), and reloads skills so
+they're ready right away. It takes about 0.1 s and never touches other projects.
+
+Rules live in `<library>/AUTO`, one per line:
+
 ```
-
-Needs `python3` (preinstalled on macOS with the Xcode command line tools, and on most Linux distros).
-
-## Your library
-
-Any folder of skills works:
-
-```
-my-skills/                         my-skills/
-  AUTO                               AUTO
-  stageshow/SKILL.md                 design/stageshow/SKILL.md
-  remotion-tips/SKILL.md             design/ui-polish/SKILL.md
-                                     motion/remotion-tips/SKILL.md
-     (flat)                            (categories: a rule can turn on a whole folder)
-```
-
-## Rules (`<library>/AUTO`)
-
-```
-# <check> <value>        <skills or categories...>
 dep  remotion            motion stageshow     # package.json dependency (globs ok: @remotion/*)
 dep  next                design
 file components.json     design               # file or glob in the project root
-file *.xcodeproj         ios
 ```
 
-`init` copies [rules.example](rules.example) into your library to start from. Rules that name
-skills you don't have are skipped.
+A target is a skill folder or a category folder (`design/` turns on every skill in it). Rules that
+name skills you don't have are skipped. Starter rules: [rules.example](rules.example).
 
-## Commands
+</details>
 
-| Command | What it does |
-|---|---|
-| `auto-skills check [dir]` | preview what a project would get |
-| `auto-skills use <skill/category>` | turn on for the current project by hand (`--off`, `--list`) |
-| `auto-skills off` / `on` | pause / resume automatic mode |
-| `auto-skills status` | mode, hook, library |
-| `touch .claude/.no-auto-skills` | opt one project out |
+<details>
+<summary><b>Without the plugin system (CLI)</b></summary>
 
-## How it works
+Needs `python3`.
 
-A `SessionStart` hook reads the project's `package.json` and root files, matches them against your
-rules, links the matching skills, and returns `reloadSkills: true` so they're available in that same
-session. It never touches `~/.claude/skills`, so two sessions in different projects can't interfere
-with each other. It runs in about 0.1 s and exits quietly on anything unexpected.
+```bash
+git clone https://github.com/anthonyych4n/auto-skills ~/auto-skills
+ln -s ~/auto-skills/bin/auto-skills ~/.local/bin/auto-skills
+auto-skills init --library ~/path/to/your/skills
+auto-skills install-hook     # adds the hook to ~/.claude/settings.json (backed up first)
+```
 
-## Develop
+Commands: `check [dir]` · `use <skill|category>` (`--off`, `--list`) · `on` / `off` · `status`.
+Opt a project out with `touch .claude/.no-auto-skills`.
+
+</details>
+
+<details>
+<summary><b>Develop</b></summary>
 
 ```bash
 python3 -m unittest discover tests
-cd demo && npm install && npm run studio   # the launch clip, made with Remotion
-npm run render                              # → demo/out/auto-skills-demo-{16x9,9x16}.mp4
+cd demo && npm install && npm run studio    # the launch video, made with Remotion
 ```
+
+</details>
 
 MIT licensed.
