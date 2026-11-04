@@ -2,9 +2,6 @@
 
 **The right Claude Code skills for each project, turned on automatically.**
 
-[![auto-skills demo: open a Remotion repo and video skills turn on; open a Next.js app and design skills swap in](media/poster.png)](media/launch-16x9.mp4)
-
-▶ [Watch the 30-second demo](media/launch-16x9.mp4) · [vertical cut](media/launch-9x16.mp4)
 
 Everything in `~/.claude/skills` loads into every session, so your video skills sit in your app
 repo and your design skills sit in your video repo. auto-skills keeps your skills in a library and,
