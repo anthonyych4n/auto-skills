@@ -2,6 +2,7 @@
 
 **The right Claude Code skills for each project, turned on automatically.**
 
+https://github.com/user-attachments/assets/4ae070b0-cffc-4532-a35f-861fd1667617
 
 Everything in `~/.claude/skills` loads into every session, so your video skills sit in your app
 repo and your design skills sit in your video repo. auto-skills keeps your skills in a library and,
