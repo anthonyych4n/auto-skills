@@ -94,8 +94,10 @@ const SkillsPanel: React.FC = () => {
   const e = useEnter(8, 20);
   const app = frame >= T.appMatch;
   const project = frame < T.vidMatch ? "—" : app ? "my-app" : "launch-video";
-  const count = frame < T.vidPills ? 0 : 4;
-  const fill = interpolate(frame, [T.vidPills, T.vidPills + 30], [0, count / ALL_SKILLS.length], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const exitAt = T.appMatch - 4;
+  const count = frame < T.vidPills ? 0 : frame < exitAt ? 4 : frame < T.appPills ? 0 : 4;
+  const k = 4 / ALL_SKILLS.length;
+  const fill = interpolate(frame, [T.vidPills, T.vidPills + 24, exitAt, exitAt + 10, T.appPills, T.appPills + 24], [0, k, k, 0, 0, k], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   return (
     <div
@@ -117,8 +119,8 @@ const SkillsPanel: React.FC = () => {
       <div style={{ fontFamily: MONO, fontSize: 40 * u, fontWeight: 500, color: C.ink }}>{project}</div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 * u, alignItems: "flex-start", }}>
-        {!app && VIDEO_SKILLS.map((s, i) => <Pill key={`v-${s}`} label={s} at={T.vidPills + i * 6} exitAt={T.cdApp + 14} tone="accent" />)}
-        {app && APP_SKILLS.map((s, i) => <Pill key={`a-${s}`} label={s} at={T.appPills + i * 6} tone="accent" />)}
+        {frame < exitAt + 10 && VIDEO_SKILLS.map((s, i) => <Pill key={`v-${s}`} label={s} at={T.vidPills + i * 6} exitAt={exitAt} tone="accent" />)}
+        {frame >= exitAt + 10 && APP_SKILLS.map((s, i) => <Pill key={`a-${s}`} label={s} at={T.appPills + i * 6} tone="accent" />)}
       </div>
 
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 14 * u }}>
