@@ -14,7 +14,7 @@ project needs: your video skills in a Remotion repo, your design skills in a Nex
 /plugin install auto-skills@auto-skills
 ```
 
-Then tell Claude: **"set up auto-skills"**. It finds your skills and picks sensible rules.
+Then tell Claude: **"set up auto-skills"**. It asks where your skills are and sets up starter rules.
 
 ## Use it
 
