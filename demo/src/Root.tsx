@@ -17,7 +17,7 @@ const SCENES = [
 ];
 const TOTAL = 900;
 // Royalty-free track in public/music/, or undefined for effects only.
-const MUSIC: string | undefined = undefined;
+const MUSIC: string | undefined = "music/lofi-hip-hop.mp3";
 
 type Props = { sound?: boolean; music?: string };
 

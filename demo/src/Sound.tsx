@@ -16,6 +16,10 @@ const Sfx: React.FC<{ at: number; src: string; volume?: number }> = ({ at, src, 
 const typing = (start: number, text: string) =>
   Array.from({ length: Math.ceil(text.length / 2) }, (_, i) => ({ at: start + i * 2 * TYPE_SPEED, k: i % 5 }));
 
+// The track's beat comes in at 10.0s; start it 1.4s in so the beat drops as the demo scene
+// (and `auto-skills on`) arrives at 8.6s.
+const MUSIC_OFFSET = Math.round(1.4 * 30);
+
 export const Sound: React.FC<{ music?: string }> = ({ music }) => {
   const keys = [
     ...typing(DEMO + 14, "auto-skills on"),
@@ -30,7 +34,8 @@ export const Sound: React.FC<{ music?: string }> = ({ music }) => {
       {music ? (
         <Audio
           src={staticFile(music)}
-          volume={(f) => interpolate(f, [0, 20, 840, 900], [0, 0.32, 0.32, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
+          trimBefore={MUSIC_OFFSET}
+          volume={(f) => interpolate(f, [0, 15, 840, 900], [0, 0.5, 0.5, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}
         />
       ) : null}
       {pilePops.map((at, i) => <Sfx key={`pp${i}`} at={at} src="pop" volume={0.18 + (i / pilePops.length) * 0.2} />)}
