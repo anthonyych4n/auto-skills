@@ -57,12 +57,12 @@ class AutoSkillsTest(unittest.TestCase):
         self.assertIn("external-only", out)  # reported as not linkable
 
     def test_hook_does_nothing_when_off(self):
+        self.run_cli("off")
         p = self.project("vid", {"remotion": "4"})
         self.assertIsNone(self.hook(p))
         self.assertEqual(self.linked(p), [])
 
     def test_hook_links_and_reloads_when_on(self):
-        self.run_cli("on")
         p = self.project("vid", {"remotion": "4"}, files=["clip.mp4"])
         out = self.hook(p)
         self.assertTrue(out["reloadSkills"])
@@ -72,7 +72,6 @@ class AutoSkillsTest(unittest.TestCase):
         self.assertNotIn(".claude", status)  # links are git-excluded
 
     def test_hook_skips_opt_out_home_and_library(self):
-        self.run_cli("on")
         p = self.project("app", {"react": "19"})
         (p / ".claude").mkdir()
         (p / ".claude" / ".no-auto-skills").write_text("")
@@ -82,9 +81,21 @@ class AutoSkillsTest(unittest.TestCase):
         self.assertIsNone(self.hook(self.lib))
 
     def test_hook_survives_bad_input(self):
-        self.run_cli("on")
         out = self.run_cli("hook", stdin="not json")
         self.assertEqual(out.returncode, 0)
+
+    def test_unconfigured_hook_offers_setup(self):
+        (self.home / "cfg.json").unlink()
+        p = self.project("vid", {"remotion": "4"})
+        out = self.hook(p)
+        self.assertIn("not set up", out["additionalContext"])
+        self.assertNotIn("reloadSkills", out)
+
+    def test_init_copies_starter_rules(self):
+        lib2 = self.tmp / "lib2"
+        (lib2 / "x").mkdir(parents=True)
+        self.run_cli("init", "--library", str(lib2))
+        self.assertIn("dep  remotion", (lib2 / "AUTO").read_text())
 
     def test_use_on_off_list(self):
         p = self.project("manual")

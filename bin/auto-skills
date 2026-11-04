@@ -5,8 +5,8 @@ Keep a skills library (<library>/<category>/<skill>/SKILL.md). When a session st
 hook matches the project against your rules (package.json deps, files) and links the matching
 skills into <project>/.claude/skills, so only that project sees them.
 
-  auto-skills init --library DIR [--rules FILE]   point at your skills library
-  auto-skills on | off | status                   toggle automatic mode
+  auto-skills init --library DIR [--rules FILE]   point at your skills library (copies starter rules)
+  auto-skills on | off | status                   automatic mode (on once installed)
   auto-skills check [DIR]                         preview what a project would get
   auto-skills use [--off] SKILL|CATEGORY...       turn skills on/off for the current project
   auto-skills use --list                          what the current project has on
@@ -25,7 +25,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve()
 CLAUDE_DIR = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
 CONFIG = Path(os.environ.get("AUTO_SKILLS_CONFIG") or Path.home() / ".config" / "auto-skills" / "config.json")
-FLAG = CLAUDE_DIR / ".auto-skills"
+OFF_FLAG = CLAUDE_DIR / ".auto-skills-off"
 OPT_OUT = Path(".claude") / ".no-auto-skills"
 EXAMPLE_RULES = HERE.parent.parent / "rules.example"
 
@@ -39,7 +39,7 @@ def load_config():
         cfg = {}
     lib = os.environ.get("AUTO_SKILLS_LIBRARY") or cfg.get("library")
     if not lib:
-        sys.exit("auto-skills: no library set. Run: auto-skills init --library <your skills folder>")
+        return None, None
     library = Path(lib).expanduser().resolve()
     rules = cfg.get("rules")
     rules = Path(rules).expanduser() if rules else (library / "AUTO" if (library / "AUTO").exists() else EXAMPLE_RULES)
@@ -230,10 +230,16 @@ def cmd_hook():
         data = json.load(sys.stdin)
     except ValueError:
         data = {}
-    if not FLAG.exists():
+    if OFF_FLAG.exists():
         return
     project = Path(data.get("cwd") or os.getcwd())
     library, rules = load_config()
+    if library is None:
+        if data.get("source", "startup") == "startup":
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext":
+                "auto-skills is installed but not set up (no skills library configured). If the user talks "
+                "about skills or setup, offer to set it up with the auto-skills skill."}}))
+        return
     if not is_project(project, library) or (project / OPT_OUT).exists():
         return
     names, why = match(project, read_rules(rules))
@@ -264,18 +270,29 @@ def main(argv):
             cfg["rules"] = str(Path(args[args.index("--rules") + 1]).expanduser().resolve())
         CONFIG.parent.mkdir(parents=True, exist_ok=True)
         CONFIG.write_text(json.dumps(cfg, indent=2) + "\n")
+        lib = Path(cfg["library"])
+        if "rules" not in cfg and not (lib / "AUTO").exists() and lib.is_dir():
+            shutil.copy2(EXAMPLE_RULES, lib / "AUTO")
+            print(f"copied starter rules to {lib / 'AUTO'}; edit them to match your skills")
         library, rules = load_config()
         print(f"library: {library} ({len(skills_in(library))} skills)\nrules:   {rules}\nconfig:  {CONFIG}")
     elif cmd == "on":
-        FLAG.parent.mkdir(parents=True, exist_ok=True)
-        FLAG.touch()
+        OFF_FLAG.unlink(missing_ok=True)
         print("auto-skills: on. New sessions turn on skills by project type.")
     elif cmd == "off":
-        FLAG.unlink(missing_ok=True)
+        OFF_FLAG.parent.mkdir(parents=True, exist_ok=True)
+        OFF_FLAG.touch()
         print("auto-skills: off. Skills already linked stay; remove them with `auto-skills use --off ...`.")
     elif cmd == "status":
-        hooked = settings_path().exists() and "auto-skills" in settings_path().read_text()
-        print(f"auto-skills: {'on' if FLAG.exists() else 'off'} · hook {'installed' if hooked else 'not installed'}")
+        plugin = (CLAUDE_DIR / "plugins") in HERE.parents
+        hooked = plugin or (settings_path().exists() and "auto-skills" in settings_path().read_text())
+        library, rules = load_config()
+        print(f"auto-skills: {'off' if OFF_FLAG.exists() else 'on'}"
+              f" · hook {'via plugin' if plugin else 'installed' if hooked else 'not installed (run install-hook)'}"
+              f"\nlibrary: {library or 'not set (run init)'}" + (f" ({len(skills_in(library))} skills)" if library else "")
+              + (f"\nrules:   {rules}" if rules else ""))
+    elif cmd in ("check", "use") and load_config()[0] is None:
+        sys.exit("auto-skills: no library set. Run: auto-skills init --library <your skills folder>")
     elif cmd == "check":
         library, rules = load_config()
         project = Path(args[0] if args else os.getcwd()).resolve()
@@ -304,7 +321,7 @@ def main(argv):
         else:
             sys.exit("usage: auto-skills use [--off] SKILL|CATEGORY... | --list")
     elif cmd == "install-hook":
-        print(f"SessionStart hook {install_hook()} in {settings_path()}. Run `auto-skills on` to enable.")
+        print(f"SessionStart hook {install_hook()} in {settings_path()}. New sessions now auto-pick skills.")
     elif cmd == "uninstall-hook":
         print(f"SessionStart hook {uninstall_hook()}.")
     else:

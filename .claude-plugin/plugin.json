@@ -1,0 +1,8 @@
+{
+  "name": "auto-skills",
+  "version": "0.1.0",
+  "description": "Turn on the right skills for each project automatically: Remotion repo gets your motion skills, a Next.js app gets your design skills, and nothing else crowds the context.",
+  "author": { "name": "Anthony Chan", "url": "https://github.com/anthonyych4n" },
+  "license": "MIT",
+  "keywords": ["skills", "session-start", "context", "per-project"]
+}

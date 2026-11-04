@@ -1,0 +1,14 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
+  "name": "auto-skills",
+  "description": "Per-project skills for Claude Code, picked automatically at session start.",
+  "owner": { "name": "Anthony Chan" },
+  "plugins": [
+    {
+      "name": "auto-skills",
+      "description": "Turn on the right skills for each project automatically.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

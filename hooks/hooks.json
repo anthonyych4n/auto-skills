@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/bin/auto-skills\" hook",
+            "timeout": 20,
+            "statusMessage": "Picking skills for this project..."
+          }
+        ]
+      }
+    ]
+  }
+}
